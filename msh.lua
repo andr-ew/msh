@@ -1,4 +1,4 @@
-include 'lib/crops'
+include 'msh/lib/crops'
 musicutil = require "musicutil"
 
 -- pulling in our engine
