@@ -1,17 +1,82 @@
+LO = 4;
+MID = 8;
+HI = 12;
+
+crops = {
+  crops = {},
+  controls = {},
+  metacontrols = {}
+}
+
+function crops:key(g, x, y, z)
+  for k,v in pairs(self.crops) do
+    v:key(g, x, y, z)
+  end
+end
+
+function crops:draw(g)
+  for k,v in pairs(self.crops) do
+    v:draw(g)
+  end
+end
+
+crop = {
+  en = function(self) return true end
+}
+
+function crop:key(g, x, y, z)
+  if self:en() then
+    for k,v in pairs(self) do
+      if type(v) == "table" and v.is_control then
+        
+        local pressed, args = v:key(x, y, z)
+        
+        if pressed then
+          v:event(table.unpack(args))
+          
+          for i,w in ipairs(crops.metacontrols) do
+            w:pass(args)
+          end
+        end
+        
+        v:draw(g)
+      end
+    end
+  end
+end
+
+function crop:draw(g)
+  if self:en() then
+    for k,v in pairs(self) do
+      if type(v) == "table" and v.is_control then
+        v:draw(g)
+      end
+    end
+  end
+end
+
+function crop:new(o)
+    o = o or {}
+    setmetatable(o, self)
+    self.__index = self
+    
+    table.insert(crops.crops, o)
+    
+    return o
+end
+
 control = {
-    v = 0,
-    p = { 0, 0 },
-    b = { 0, 16 },
-    enable = function(self) end,
+    b = { 0, HI },
+    en = function(self) return true end,
     event = function(self) end,
-    output = function(self, v) return v end,
     get = function(self) return self.v end,
     set = function(self, input)
         self.v = input
         self:event(self.v)
     end,
     draw = function(self, g) end,
-    look = function() end
+    key = function() end,
+    is_control = true
 }
 
 function control:new(o)
@@ -19,26 +84,31 @@ function control:new(o)
     setmetatable(o, self)
     self.__index = self
     
+    table.insert(crops.controls, o)
+    
     return o
 end
+
+metacontrol = control:new({
+  pass = function(self) end
+})
 
 toggle = control:new()
 
 function toggle:draw(g)
-    if self.enable() then
-        g:led(self.p[1], self.p[2], self.b[self.v])
+    if self:en() then
+        g:led(self.p[1], self.p[2], self.b[self.v and 2 or 1])
     end
 end
 
-function toggle:look(x, y, z)
-    if self.enable() then
+function toggle:key(x, y, z)
+    if self:en() then
         if x == self.p[1] and y == self.p[2] then
             if z == 0 then
                 local last = self.v
-                self.v = Math.abs(self.v - 1)
-                self:event(self.v, last)
+                self.v = not self.v
                 
-                return true
+                return true, { self.v, last }
             end
         end
     end
@@ -51,36 +121,34 @@ end
 
 momentary = toggle:new()
 
-function momentary:look(x, y, z)
-    if self.enable() then
+function momentary:key(x, y, z)
+    if self:en() then
         if x == self.p[1] and y == self.p[2] then
-            local v = z
-            self:event(v)
-            self.v = v
+            self.v = z == 1
             
-            return true
+            return true, { self.v }
         end
     end
 end
 
-value = control:new()
+value = control:new({ v = 1 })
 
 function value:draw(g)
-    if self.enable() then
+    if self:en() then
         if type(self.p[1]) == "table" then
             for i = self.p[1][1], self.p[1][2] do
-                g:led(i, self.p[2], (i - self.p[1][1] == v) and self.b[2] or self.b[1])
+                g:led(i, self.p[2], (i - self.p[1][1] + 1 == self.v) and self.b[2] or self.b[1])
             end
         elseif type(self.p[2]) == "table" then
             for i = self.p[2][1], self.p[2][2] do
-                g:led(self.p[1], i, (i - self.p[1][1] == v) and self.b[2] or self.b[1])
+                g:led(self.p[1], i, (i - self.p[2][1] + 1 == self.v) and self.b[2] or self.b[1])
             end
         end
     end
 end
 
-function value:look(x, y, z)
-    if self.enable() then
+function value:key(x, y, z)
+    if self:en() then
         
         local is_x = (type(self.p[1]) == "table")
         local l_p = is_x and self.p[1] or self.p[2]
@@ -92,11 +160,9 @@ function value:look(x, y, z)
             for i = l_p[1], l_p[2] do
                 if i == l_dim and z == 1 then
                     local last = self.v
-                    local v = i - l_p[1]
-                    self:event(v, last)
-                    self.v = v
+                    self.v = i + 1 - l_p[1]
 
-                    return true
+                    return true, { self.v, last }
                 end
             end
         end
@@ -105,8 +171,18 @@ end
 
 toggles = control:new()
 
+function toggles:new(o)
+    o = o or {}
+    setmetatable(o, self)
+    self.__index = self
+    
+    table.insert(crops.controls, o)
+    
+    return o
+end
+
 function toggles:draw(g)
-    if self.enable() then
+    if self:en() then
         
         local is_x = (type(self.p[1]) == "table")
         local l_p = is_x and self.p[1] or self.p[2]
@@ -115,7 +191,7 @@ function toggles:draw(g)
         local s_dim = is_x and y or x
         
         local mtrx = {}
-        for i = 1, p[2] - p[1] do
+        for i = 1, l_p[2] - l_p[1] do
             mtrx[i] = false
         end
         for i,v in ipairs(self.v) do
@@ -132,8 +208,8 @@ function toggles:draw(g)
     end
 end
 
-function toggles:look(x, y, z)
-     if self.enable() then
+function toggles:key(x, y, z)
+     if self:en() then
         
         local is_x = (type(self.p[1]) == "table")
         local l_p = is_x and self.p[1] or self.p[2]
@@ -161,19 +237,19 @@ function toggles:look(x, y, z)
                         removed = i
                     end
                     
-                    self:event(v, last, added, removed)
-
-                    return true
+                    return true, { self.v, last, added, removed }
                 end
             end
         end
     end
 end
 
-momentaires = toggles:new()
+tabutil = require 'tabutil'
+
+momentaries = toggles:new()
     
-function momentaries:look(x, y, z)
-    if self.enable() then
+function momentaries:key(x, y, z)
+    if self:en() then
         
         local is_x = (type(self.p[1]) == "table")
         local l_p = is_x and self.p[1] or self.p[2]
@@ -186,7 +262,7 @@ function momentaries:look(x, y, z)
                 if i == l_dim then
                     local last = {}
                     local thing = -1
-                    for j,v in ipairs(self.v) do 
+                    for j,v in ipairs(self.v) do
                         last[j] = v 
                         if v == i then thing = j end --?
                     end
@@ -200,10 +276,8 @@ function momentaries:look(x, y, z)
                         table.remove(self.v, thing)
                         removed = i
                     end
-                    
-                    self:event(v, last, added, removed)
 
-                    return true
+                    return true, { self.v, last, added, removed }
                 end
             end
         end
