@@ -23,7 +23,6 @@ msh.controls = crop:new{ -- controls at the top of the grid. generated using the
                                                   -- v (initial value), and p, table defining position (x start & end points, y)
 }
 
-
 msh.make_keyboard = function(rows, offset) -- function for generating a keyboard, optional # of rows + row separation
   local keyboard = crop:new{} -- new crop (control container)
   
@@ -58,9 +57,9 @@ msh.make_keyboard = function(rows, offset) -- function for generating a keyboard
   			  note = note + math.floor((key - 1) / #scale) * 12 + self.offset -- add row offset and wrap scale to next octave
   			  
   			  if gate then
-  			    engine.noteOn(note, musicutil.note_num_to_freq(note), msh.vel()) -- for noteOn send note number, freq, + generate a velocity
+  			    msh.noteon()
   			  else
-  			    engine.noteOff(note)
+  			    msh.noteoff()
   			  end
   			end
       end
@@ -69,6 +68,13 @@ msh.make_keyboard = function(rows, offset) -- function for generating a keyboard
   
   return keyboard -- return our keybaord
 end
+
+
+msh.noteon = function(note)  
+  engine.noteOn(note, musicutil.note_num_to_freq(note), msh.vel()) -- for noteOn send note number, freq, + generate a velocity
+end
+
+msh.noteoff = function(note) engine.noteOff(note) end
 
 msh.keyboard = msh.make_keyboard(7, 12) -- call keybaord function w/ 8 rows & octave separation. u can change this !
   
