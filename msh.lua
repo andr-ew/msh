@@ -57,9 +57,9 @@ msh.make_keyboard = function(rows, offset) -- function for generating a keyboard
   			  note = note + math.floor((key - 1) / #scale) * 12 + self.offset -- add row offset and wrap scale to next octave
   			  
   			  if gate then
-  			    msh.noteon()
+  			    msh.noteon(note)
   			  else
-  			    msh.noteoff()
+  			    msh.noteoff(note)
   			  end
   			end
       end
